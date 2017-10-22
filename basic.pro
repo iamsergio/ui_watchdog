@@ -7,3 +7,5 @@ QT += widgets
 
 HEADERS += \
     uiwatchdog.h
+
+CONFIG += console

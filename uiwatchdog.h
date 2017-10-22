@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <QTimer>
 #include <QMutex>
 #include <QElapsedTimer>
+#include <QLoggingCategory>
 #include <QDebug>
 
 #ifdef Q_OS_WIN
@@ -29,6 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 #define MAX_TIME_BLOCKED 300 // ms
+
+Q_DECLARE_LOGGING_CATEGORY(uidelays)
+Q_LOGGING_CATEGORY(uidelays, "uidelays")
 
 class UiWatchdog;
 class UiWatchdogWorker : public QObject
@@ -46,7 +50,14 @@ private:
         , m_watchTimer(new QTimer(this))
         , m_options(options)
     {
+        qCDebug(uidelays) << "UiWatchdogWorker created";
         connect(m_watchTimer, &QTimer::timeout, this, &UiWatchdogWorker::checkUI);
+    }
+
+    ~UiWatchdogWorker()
+    {
+        qCDebug(uidelays) << "UiWatchdogWorker destroyed";
+        stop();
     }
 
     void start(int frequency_msecs = 200)
@@ -105,12 +116,15 @@ public:
         , m_uiTimer(new QTimer(this))
         , m_options(options)
     {
+        QLoggingCategory::setFilterRules("uidelays.debug=false");
+        qCDebug(uidelays) << "UiWatchdog created";
         connect(m_uiTimer, &QTimer::timeout, this, &UiWatchdog::onUiBeat);
     }
 
     ~UiWatchdog()
     {
         stop();
+        qCDebug(uidelays) << "UiWatchdog destroyed";
     }
 
     void start(int frequency_msecs = 100)
@@ -127,9 +141,6 @@ public:
         connect(m_watchDogThread, &QThread::started, m_worker, [this, frequency_msecs] {
             m_worker->start(frequency_msecs);
         });
-
-        connect(m_worker, &QObject::destroyed, m_watchDogThread, &QThread::quit);
-        connect(m_watchDogThread, &QThread::finished, m_watchDogThread, &QObject::deleteLater);
     }
 
     void stop()
@@ -138,8 +149,11 @@ public:
             return;
 
         m_uiTimer->stop();
-        m_worker->stop();
         m_worker->deleteLater();
+        m_watchDogThread->quit();
+        const bool didquit = m_watchDogThread->wait(2000);
+        qCDebug(uidelays) << "watch thread quit?" << didquit;
+        delete m_watchDogThread;
 
         m_watchDogThread = nullptr;
         m_worker = nullptr;
