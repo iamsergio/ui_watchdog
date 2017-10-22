@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "uiwatchdog.h"
 
 #include <QDebug>
+#include <QTimer>
 #include <QtWidgets>
 
 int main(int argc, char **argv)
@@ -34,26 +35,25 @@ int main(int argc, char **argv)
     layout->addStretch();
     layout->addWidget(button3);
 
-    bool should_cancel = false;
-
-    button->connect(button, &QPushButton::clicked, [] {
+    QObject::connect(button, &QPushButton::clicked, [] {
         qDebug() << "Blocking forever!";
         while(true);
     });
 
-    button->connect(button2, &QPushButton::clicked, [&should_cancel] {
-        qDebug() << "Starting to sleep every now and then";
-        while(!should_cancel) {
-            QThread::sleep(1);
-            QApplication::processEvents();
-        }
-
-        should_cancel = false;
+    auto sleepTimer = new QTimer();
+    sleepTimer->setInterval(1000);
+    QObject::connect(sleepTimer, &QTimer::timeout, [] {
+        qDebug() << "Sleeping";
+        QThread::sleep(1);
+        qDebug() << "Waking up";
     });
 
-    button->connect(button3, &QPushButton::clicked, [&should_cancel] {
-        qDebug() << "Event loop running again";
-        should_cancel = true;
+    QObject::connect(button2, &QPushButton::clicked, [sleepTimer] {
+        sleepTimer->start();
+    });
+
+    QObject::connect(button3, &QPushButton::clicked, [sleepTimer] {
+        sleepTimer->stop();
     });
 
     UiWatchdog dog;

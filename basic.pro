@@ -1,5 +1,5 @@
 TEMPLATE = app
-TARGET = basic
+TARGET = ui_watchdog
 INCLUDEPATH += .
 
 SOURCES += main.cpp
